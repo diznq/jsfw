@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="fw.js"></script>
+</head>
+<body>
+    <div fw>
+        <div onclick="state.count++;">
+            <h1 if="return {count}%2==0">{hello}</h1>
+            <h1 if="{count}%2==1">{annyeong}</h1>
+            <span>You clicked me {count}</span><span if="{count}==1"> time</span><span if="{count}!=1"> times</span>
+        </div>
+    </div>
+</body>
+</html>
