@@ -9,7 +9,7 @@ class FW {
     /**
      * Create state
      * @param {[key: string]: any} state 
-     * @returns {Proxy<{[key: string]: any}>
+     * @returns {{[key: string]: any}>
      */
     addState(state){
         const self = this
@@ -24,9 +24,9 @@ class FW {
 
     /**
      * Add listener
-     * @param {*} key 
-     * @param {*} callback 
-     * @param {*} run 
+     * @param {!string} key 
+     * @param {!(() => void)} callback 
+     * @param {?boolean} run 
      */
     addWatchdog(key, callback, run){
         run = run || false
@@ -40,11 +40,13 @@ class FW {
 
     /**
      * Bootstrap element
-     * @param {HTMLElement} element 
+     * @param {!{[key: string]: any}} state
+     * @param {!HTMLElement} element 
      */
     bootstrap(state, element) {
         element.wd = element.wd || []
         const children = element.querySelectorAll(":scope > *")
+        // If element has no children, and only has a single node#3, we can replace {...} safely
         if(children.length == 0){
             const content = element.textContent
             const matches = content.match(/\{(.*?)\}/g)
@@ -57,6 +59,8 @@ class FW {
                 fix()
             }
         }
+
+        // If element is conditional, hide it if condition fails, display otherwise
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
             const matches = condition.match(/\{([a-zA-Z0-9_]+)\}/g)
@@ -75,8 +79,9 @@ class FW {
             fix()
         }
 
-        // todo remove watchdogs in element.wd on destroy
+        // TODO: remove watchdogs in element.wd on destroy
 
+        // Loop through children
         children.forEach(child => {
             if(child.tagName == "SCRIPT") return;
             this.bootstrap(state, child)
