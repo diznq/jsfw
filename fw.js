@@ -8,7 +8,7 @@ class FW {
 
     /**
      * Create state
-     * @param {[key: string]: any} state 
+     * @param {{[key: string]: any}} state 
      * @param {?string} parentPath
      * @returns {{[key: string]: any}>
      */
