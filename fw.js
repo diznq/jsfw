@@ -9,9 +9,10 @@ class FW {
     /**
      * Create state
      * @param {[key: string]: any} state 
+     * @param {?string} parentPath
      * @returns {{[key: string]: any}>
      */
-    addState(state, parent, parentPath){
+    addState(state, parentPath){
         parentPath = parentPath || ""
         if(parentPath.startsWith(".")) parentPath = parentPath.substring(1)
         const self = this
@@ -21,11 +22,7 @@ class FW {
                 const element = state[key];
                 // If state contains object, wrap it into proxy as well, but with different parent path already
                 if(typeof(element) == "object"){
-                    state[key] = this.addState(element, () => {
-                        const pool = self.watchdog[key] || []
-                        typeof(parent) == "function" && parent()
-                        pool.forEach(item => item())
-                    }, parentPath + "." + key)
+                    state[key] = this.addState(element, parentPath + "." + key)
                 }
             }
         }
@@ -35,7 +32,6 @@ class FW {
                 if(path.startsWith(".")) path = path.substring(1)
                 const pool = self.watchdog[path] || []
                 target[key] = value
-                typeof(parent) == "function" && parent()
                 pool.forEach(item => item())
             }
         })
@@ -57,6 +53,12 @@ class FW {
         }
     }
 
+    /**
+     * Get variable from state
+     * @param {!{[key: string]: any}} state 
+     * @param {!string} path 
+     * @returns {any}
+     */
     get(state, path){
         const parts = path.split(".")
         let obj = state
