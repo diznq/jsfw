@@ -9,10 +9,11 @@
 </head>
 <body>
     <div fw>
-        <div onclick="state.count++;">
+        <div onclick="state.count++; state.nested.variable+=5;">
             <h1 if="return {count}%2==0"><span>{hello}</span><span if="{name}.length > 0">, {name}!</span></h1>
             <h1 if="{count}%2==1"><span>{annyeong}</span><span if="{name}.length > 0">, {name}!</span></h1>
-            <span>You clicked me {count}</span><span if="{count}==1"> time</span><span if="{count}!=1"> times</span>
+            <span>You clicked me {count}</span><span if="{count}==1"> time</span><span if="{count}!=1"> times</span><br>
+            <span>Nested variable: {nested.variable}</span>
         </div>
         <input type="text" name="inp0" autocomplete="off" placeholder="Type your name" oninput="state.name=this.value">
     </div>

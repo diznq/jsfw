@@ -11,12 +11,31 @@ class FW {
      * @param {[key: string]: any} state 
      * @returns {{[key: string]: any}>
      */
-    addState(state){
+    addState(state, parent, parentPath){
+        parentPath = parentPath || ""
+        if(parentPath.startsWith(".")) parentPath = parentPath.substring(1)
         const self = this
+        // Check for nested objects
+        for (const key in state) {
+            if (Object.hasOwnProperty.call(state, key)) {
+                const element = state[key];
+                // If state contains object, wrap it into proxy as well, but with different parent path already
+                if(typeof(element) == "object"){
+                    state[key] = this.addState(element, () => {
+                        const pool = self.watchdog[key] || []
+                        typeof(parent) == "function" && parent()
+                        pool.forEach(item => item())
+                    }, parentPath + "." + key)
+                }
+            }
+        }
         return new Proxy(state, {
             set(target, key, value){
-                const pool = self.watchdog[key] || []
+                let path = parentPath + "." + key
+                if(path.startsWith(".")) path = path.substring(1)
+                const pool = self.watchdog[path] || []
                 target[key] = value
+                typeof(parent) == "function" && parent()
                 pool.forEach(item => item())
             }
         })
@@ -38,6 +57,14 @@ class FW {
         }
     }
 
+    get(state, path){
+        const parts = path.split(".")
+        let obj = state
+        let end = parts.pop()
+        while(parts.length > 0) obj=obj[parts.shift()]
+        return obj[end]
+    }
+
     /**
      * Bootstrap element
      * @param {!{[key: string]: any}} state
@@ -51,7 +78,7 @@ class FW {
             const content = element.textContent
             const matches = content.match(/\{(.*?)\}/g)
             if(matches && matches.length > 0){
-                const fix = () => element.textContent = content.replace(/\{(.*?)\}/g, (_, m) => state[m])
+                const fix = () => element.textContent = content.replace(/\{(.*?)\}/g, (_, m) => this.get(state, m))
                 matches.forEach(match => {
                     const key = match.substring(1, match.length - 1)
                     element.wd.push(this.addWatchdog(key, fix))
@@ -63,7 +90,7 @@ class FW {
         // If element is conditional, hide it if condition fails, display otherwise
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
-            const matches = condition.match(/\{([a-zA-Z0-9_]+)\}/g)
+            const matches = condition.match(/\{([a-zA-Z0-9_.]+)\}/g)
             condition = condition.replace(/\{(.*?)\}/g, "__STATE__.$1")
             const evaluate = () => {
                 if(condition.indexOf("return") == -1) condition = `return (${condition})`;
@@ -95,7 +122,10 @@ const state = fw.addState({
     hello: "Hello world",
     annyeong: "안녕",
     name: "",
-    count: 0
+    count: 0,
+    nested: {
+        variable: 0
+    }
 })
 
 
