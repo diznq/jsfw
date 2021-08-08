@@ -89,6 +89,7 @@ const fw = new FW()
 const state = fw.addState({
     hello: "Hello world",
     annyeong: "안녕",
+    name: "",
     count: 0
 })
 
