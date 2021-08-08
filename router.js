@@ -56,7 +56,7 @@ router.addRoute(/^\/users\/(\d+)$/, (id) => {
 
 router.addRoute(/^\/users\/(\d+)\/feed$/, { food: IS_EMAIL }, (id, query) => {
     console.log(query)
-    console.log(`I've just fed beggar #${id} with ${query.food}`)
+    console.log(`I've just fed user #${id} with ${query.food}`)
 })
 
 router.route("/users/3/feed?food=Banana&hasOwnProperty=troll&constructor=troll")
