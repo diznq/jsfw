@@ -130,18 +130,22 @@ class FW {
             }
             const fix = async () => {
                 const result = await evaluate()
-                element.style.display = result ? "" : "none"
             
                 if(result && element.hasAttribute("then")){
-                    const then = element.getAttribute("then").replace(varmatch, (_, m) => {
+                    let then = element.getAttribute("then").replace(varmatch, (_, m) => {
                         return "__STATE__." + this.remap(state, m, mapping)
                     })
+                    if(then.indexOf("return") == -1) then = `return (${then})`;
                     const fn = new Function("__STATE__,self", then)
                     const retval = fn(state, this)
+                    console.log("retval: ", retval)
                     if(typeof(retval) == "object" && retval && typeof(retval.then) == "function"){
+                        console.log("await then")
                         await retval;
                     }
                 }
+
+                element.style.display = result ? "" : "none"
             }
             matches.forEach(match => {
                 const key = match.substring(1, match.length - 1)
@@ -215,9 +219,10 @@ class FW {
                 if(matches && matches.length > 0){
                     if(attr.startsWith("fw:on")){
                         const self = this
-                        const code = content.replace(varmatch, (_, m) => {
+                        let code = content.replace(varmatch, (_, m) => {
                             return "__STATE__." + this.remap(state, m, mapping)
                         })
+                        if(code.indexOf("return") == -1) code = `return (${code})`;
                         element[attr.substring(3)] = function (event) {
                             const fn = new Function("__STATE__,self", code)
                             const res = fn.call(this, state, self)
@@ -296,8 +301,13 @@ function navigate(path){
 }
 
 function loadUser(){
-    let match = state.route.match(/^\/users\/(.*)/)[1]
-    state.viewedUser = state.users[match]
+    return new Promise( (resolve) => {
+        setTimeout( () => {
+            let match = state.route.match(/^\/users\/(.*)/)[1]
+            state.viewedUser = state.users[match]
+            resolve()
+        }, 1000);
+    });
 }
 
 function init(){
