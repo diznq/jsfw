@@ -30,12 +30,25 @@ class FW {
             set(target, key, value){
                 let path = parentPath + "." + key
                 if(path.startsWith(".")) path = path.substring(1)
-                const pool = self.watchdog[path] || []
-                if(typeof(value) == "object"){
+                const pools = [self.watchdog[path] || []]
+                
+                // In case we set new object, make it proxy as well
+                if(typeof(value) == "object" && value != null){
+                    // If it's an array, push length update + all items update
+                    let isArray = typeof(value.length) == "number"
+                    if(isArray){
+                        pools.push(self.watchdog[path + ".length"] || [])
+                        for(let i=0; i<value.length; i++){
+                            pools.push(self.watchdog[path + "." + i] || [])
+                        }
+                    } else {
+                        Object.keys(value).forEach(key => pools.push(self.watchdog[path + "." + key] || []))
+                    }
                     value = self.addState(value, path)
                 }
+
                 target[key] = value
-                pool.forEach(item => item())
+                pools.forEach(pool => pool.forEach(item => item()))
                 return true;
             }
         })
@@ -95,7 +108,7 @@ class FW {
      * @param {!HTMLElement} element 
      * @param {?{[key: string]: string}} mapping
      */
-    bootstrap(state, element, mapping) {
+    async bootstrap(state, element, mapping) {
         element.wd = element.wd || []
         mapping = mapping || {}
         const children = element.querySelectorAll(":scope > *")
@@ -107,18 +120,34 @@ class FW {
             condition = condition.replace(/\{(.*?)\}/g, (_, m) => {
                 return "__STATE__." + this.remap(state, m, mapping)
             })
-            const evaluate = () => {
+            const evaluate = async () => {
                 if(condition.indexOf("return") == -1) condition = `return (${condition})`;
-                const fn = new Function("__STATE__", condition)
-                const res = fn(state)
+                const fn = new Function("__STATE__,self", condition)
+                let res = fn(state, this)
+                if(typeof(res) == "object" && res && typeof(res.then) == "function") res = await res;
                 return res;
             }
-            const fix = () => element.style.display = evaluate() ? "" : "none"
+            const fix = async () => {
+                const result = await evaluate()
+                element.style.display = result ? "" : "none"
+            
+                if(result && element.hasAttribute("then")){
+                    const then = element.getAttribute("then").replace(/\{(.*?)\}/g, (_, m) => {
+                        return "__STATE__." + this.remap(state, m, mapping)
+                    })
+                    const fn = new Function("__STATE__,self", then)
+                    const retval = fn(state, this)
+                    if(typeof(retval) == "object" && retval && typeof(retval.then) == "function"){
+                        await retval;
+                    }
+                }
+            }
             matches.forEach(match => {
                 const key = match.substring(1, match.length - 1)
+                console.log("add if watchdog for " + this.remap(state, key, mapping))
                 element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
             })
-            fix()
+            await fix()
         }
 
         // If element is a loop
@@ -139,30 +168,30 @@ class FW {
                 //console.log(src, source)
                 parent.insertBefore(dummy, element.nextSibling)
                 element.remove()
-                const spawnClone = (after, i) => {
+                const spawnClone = async (after, i) => {
                     const newClone = clone.cloneNode(true)
                     parent.insertBefore(newClone, after)
                     newClone.innerIndex = i
                     const newMapping = JSON.parse(JSON.stringify(mapping))
                     newMapping[iterator] = source + "." + i
-                    this.bootstrap(state, newClone, newMapping)
+                    await this.bootstrap(state, newClone, newMapping)
                     return newClone
                 }
-                const insertClone = (i) => {
+                const insertClone = async (i) => {
                     let shiftClone = false
                     if(clones.length == 0){
                         clones.push(dummy)
                         shiftClone = true
                     }
-                    const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
+                    const newClone = await spawnClone(clones[clones.length - 1].nextSibling, i)
                     clones.push(newClone)
                     if(shiftClone) clones.shift()
                     return newClone
                 }
-                this.addWatchdog(source + ".length", () => {
+                this.addWatchdog(source + ".length", async () => {
                     let item = this.get(state, source, mapping)
                     for(let i=clones.length; i<item.length; i++){
-                        insertClone(i)
+                        await insertClone(i)
                     }
                     while(clones.length > item.length){
                         const last = clones.pop()
@@ -170,12 +199,31 @@ class FW {
                     }
                 })
                 for(let i=0; i<src.length; i++){
-                    insertClone(i)
+                    await insertClone(i)
                 }
             }
             // Root element doesn't exist anymore, so skip other processing
             return;
         }
+
+        // Search for all fw:* attributes and fix them
+        const attributes = element.getAttributeNames()
+        attributes.forEach(attr => {
+            if(attr.startsWith("fw:")){
+                const content = element.getAttribute(attr)
+                const matches = content.match(/\{(.*?)\}/g)
+                if(matches && matches.length > 0){
+                    const fix = () => element.setAttribute(attr.substring(3), content.replace(/\{(.*?)\}/g, (_, m) =>  {
+                        return this.get(state, m, mapping)
+                    }))
+                    matches.forEach(match => {
+                        const key = match.substring(1, match.length - 1)
+                        element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                    })
+                    fix()
+                }
+            }
+        })
 
         // If element has no children, and only has a single node#3, we can replace {...} safely
         if(children.length == 0){
@@ -206,18 +254,35 @@ class FW {
 
 const fw = new FW()
 const state = fw.addState({
-    hello: "Hello world",
-    annyeong: "안녕",
-    name: "",
-    count: 0,
-    arr: [
-        ["Jakub", "Anna"]
+    route: location.hash.substring(1),
+    users: [
+        {
+            id: 0,
+            name: "Jakub",
+            age: 23,
+        },
+        {
+            id: 1,
+            name: "Anna",
+            age: 21
+        }
     ],
-    nested: {
-        variable: 0
+    viewedUser: {
+        id: 0,
+        name: "",
+        age: 0
     }
 })
 
+function navigate(path){
+    location.hash = path
+    state.route = path
+}
+
+function loadUser(){
+    let match = state.route.match(/^\/users\/(.*)/)[1]
+    state.viewedUser = state.users[match]
+}
 
 function init(){
     const elements = document.querySelectorAll("[fw]")

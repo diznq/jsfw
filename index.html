@@ -9,16 +9,21 @@
 </head>
 <body>
     <div fw>
-        <div onclick="state.count++; state.nested.variable+=5;">
-            <h1 if="return {count}%2==0"><span>{hello}</span><span if="{name}.length > 0">, {name}!</span></h1>
-            <h1 if="{count}%2==1"><span>{annyeong}</span><span if="{name}.length > 0">, {name}!</span></h1>
-            <span>You clicked me {count}</span><span if="{count}==1"> time</span><span if="{count}!=1"> times</span><br>
-            <span>Nested variable: {nested.variable}</span>
+        <div if="/^\/users\/?$/.test({route})">
+            <h1>Users:</h1>
+            <table style="border-collapse: collapse; width: 500px" border="1">
+                <tr><th>Name</th><th>Age</th></tr>
+                <tr each="user in users">
+                    <td><a fw:href="#/users/{user.id}" onclick="state.route = this.hash.substring(1)">{user.name}</a></td>
+                    <td>{user.age}</td>
+                </tr>
+            </table>
         </div>
-        <h1 each="item in arr">
-            Hello, <span style="color: red" each="name in item">{name}!</span>
-        </h1>
-        <input type="text" name="inp0" autocomplete="off" placeholder="Type your name" oninput="state.name=this.value">
+        <div if="/^\/users\/(.+)/.test({route})" then="loadUser()">
+            <a href="#/users" onclick="state.route = this.hash.substring(1)">&lt; Back</a>
+            <h1 if="{viewedUser}">User: {viewedUser.name}</h1>
+            <h1 if="!{viewedUser}">Unknown user</h1>
+        </div>
     </div>
 </body>
 </html>
