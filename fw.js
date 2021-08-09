@@ -109,6 +109,7 @@ class FW {
      * @param {?{[key: string]: string}} mapping
      */
     async bootstrap(state, element, mapping) {
+        const varmatch = /\{([a-zA-Z0-9_.]+)\}/g;
         element.wd = element.wd || []
         mapping = mapping || {}
         const children = element.querySelectorAll(":scope > *")
@@ -116,8 +117,8 @@ class FW {
         // If element is a conditional, hide it if the condition fails, display it otherwise
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
-            const matches = condition.match(/\{([a-zA-Z0-9_.]+)\}/g)
-            condition = condition.replace(/\{(.*?)\}/g, (_, m) => {
+            const matches = condition.match(varmatch)
+            condition = condition.replace(varmatch, (_, m) => {
                 return "__STATE__." + this.remap(state, m, mapping)
             })
             const evaluate = async () => {
@@ -132,7 +133,7 @@ class FW {
                 element.style.display = result ? "" : "none"
             
                 if(result && element.hasAttribute("then")){
-                    const then = element.getAttribute("then").replace(/\{(.*?)\}/g, (_, m) => {
+                    const then = element.getAttribute("then").replace(varmatch, (_, m) => {
                         return "__STATE__." + this.remap(state, m, mapping)
                     })
                     const fn = new Function("__STATE__,self", then)
@@ -144,7 +145,6 @@ class FW {
             }
             matches.forEach(match => {
                 const key = match.substring(1, match.length - 1)
-                console.log("add if watchdog for " + this.remap(state, key, mapping))
                 element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
             })
             await fix()
@@ -211,16 +211,32 @@ class FW {
         attributes.forEach(attr => {
             if(attr.startsWith("fw:")){
                 const content = element.getAttribute(attr)
-                const matches = content.match(/\{(.*?)\}/g)
+                const matches = content.match(varmatch)
                 if(matches && matches.length > 0){
-                    const fix = () => element.setAttribute(attr.substring(3), content.replace(/\{(.*?)\}/g, (_, m) =>  {
-                        return this.get(state, m, mapping)
-                    }))
-                    matches.forEach(match => {
-                        const key = match.substring(1, match.length - 1)
-                        element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
-                    })
-                    fix()
+                    if(attr.startsWith("fw:on")){
+                        const self = this
+                        const code = content.replace(varmatch, (_, m) => {
+                            return "__STATE__." + this.remap(state, m, mapping)
+                        })
+                        element[attr.substring(3)] = function (event) {
+                            const fn = new Function("__STATE__,self", code)
+                            const res = fn.call(this, state, self)
+                            if(typeof(res) == "boolean" && !res){
+                                event.stopPropagation()
+                                event.preventDefault()
+                            }
+                            return res;
+                        }
+                    } else {
+                        const fix = () => element.setAttribute(attr.substring(3), content.replace(varmatch, (_, m) =>  {
+                            return this.get(state, m, mapping)
+                        }))
+                        matches.forEach(match => {
+                            const key = match.substring(1, match.length - 1)
+                            element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                        })
+                        fix()
+                    }
                 }
             }
         })
@@ -228,9 +244,9 @@ class FW {
         // If element has no children, and only has a single node#3, we can replace {...} safely
         if(children.length == 0){
             const content = element.textContent
-            const matches = content.match(/\{(.*?)\}/g)
+            const matches = content.match(varmatch)
             if(matches && matches.length > 0){
-                const fix = () => element.textContent = content.replace(/\{(.*?)\}/g, (_, m) =>  {
+                const fix = () => element.textContent = content.replace(varmatch, (_, m) =>  {
                     return this.get(state, m, mapping)
                 })
                 matches.forEach(match => {

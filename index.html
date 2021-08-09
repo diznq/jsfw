@@ -10,7 +10,7 @@
 <body>
     <div fw>
         <div if="/^\/users\/?$/.test({route})">
-            <h1>Users:</h1>
+            <h1 fw:onclick="alert({route})">Users:</h1>
             <table style="border-collapse: collapse; width: 500px" border="1">
                 <tr><th>Name</th><th>Age</th></tr>
                 <tr each="user in users">
@@ -18,10 +18,16 @@
                     <td>{user.age}</td>
                 </tr>
             </table>
+            <form fw:onsubmit="{users}.push({id: {users.length}, name: 'User#' + {users.length}, age: Math.random()}); event.preventDefault()">
+                <input type="submit">
+            </form>
         </div>
         <div if="/^\/users\/(.+)/.test({route})" then="loadUser()">
             <a href="#/users" onclick="state.route = this.hash.substring(1)">&lt; Back</a>
-            <h1 if="{viewedUser}">User: {viewedUser.name}</h1>
+            <div if="{viewedUser}">
+                <h1>User: {viewedUser.name}</h1>
+                <h2>Age: {viewedUser.age}</h2>
+            </div>
             <h1 if="!{viewedUser}">Unknown user</h1>
         </div>
     </div>
