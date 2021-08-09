@@ -4,6 +4,7 @@ class FW {
      */
     constructor(){
         this.watchdog = {}
+        this.varmatch = /\{([a-zA-Z0-9_.]+)\}/g;
     }
 
     /**
@@ -102,6 +103,19 @@ class FW {
         return obj[end]
     }
 
+    executeCode(state, code, mapping, self) {
+        const varmatch = this.varmatch
+        code = code.replace(varmatch, (_, m) => {
+            return "__STATE__." + this.remap(state, m, mapping)
+        })
+        if(code.indexOf("return") == -1) code = `return (${code})`;
+        console.log(code)
+        const fn = new Function("__STATE__,self", code)
+        if(typeof(self) != "undefined") 
+            return fn.call(self, state, this)
+        return fn(state, this)
+    }
+
     /**
      * Bootstrap element
      * @param {!{[key: string]: any}} state
@@ -109,7 +123,7 @@ class FW {
      * @param {?{[key: string]: string}} mapping
      */
     async bootstrap(state, element, mapping) {
-        const varmatch = /\{([a-zA-Z0-9_.]+)\}/g;
+        const varmatch = this.varmatch
         element.wd = element.wd || []
         mapping = mapping || {}
         const children = element.querySelectorAll(":scope > *")
@@ -118,29 +132,17 @@ class FW {
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
             const matches = condition.match(varmatch)
-            condition = condition.replace(varmatch, (_, m) => {
-                return "__STATE__." + this.remap(state, m, mapping)
-            })
             const evaluate = async () => {
-                if(condition.indexOf("return") == -1) condition = `return (${condition})`;
-                const fn = new Function("__STATE__,self", condition)
-                let res = fn(state, this)
+                let res = this.executeCode(state, condition, mapping, element)
                 if(typeof(res) == "object" && res && typeof(res.then) == "function") res = await res;
                 return res;
             }
             const fix = async () => {
                 const result = await evaluate()
-            
                 if(result && element.hasAttribute("then")){
-                    let then = element.getAttribute("then").replace(varmatch, (_, m) => {
-                        return "__STATE__." + this.remap(state, m, mapping)
-                    })
-                    if(then.indexOf("return") == -1) then = `return (${then})`;
-                    const fn = new Function("__STATE__,self", then)
-                    const retval = fn(state, this)
-                    console.log("retval: ", retval)
+                    let then = element.getAttribute("then")
+                    const retval = this.executeCode(state, then, mapping, element)
                     if(typeof(retval) == "object" && retval && typeof(retval.then) == "function"){
-                        console.log("await then")
                         await retval;
                     }
                 }
@@ -219,13 +221,8 @@ class FW {
                 if(matches && matches.length > 0){
                     if(attr.startsWith("fw:on")){
                         const self = this
-                        let code = content.replace(varmatch, (_, m) => {
-                            return "__STATE__." + this.remap(state, m, mapping)
-                        })
-                        if(code.indexOf("return") == -1) code = `return (${code})`;
                         element[attr.substring(3)] = function (event) {
-                            const fn = new Function("__STATE__,self", code)
-                            const res = fn.call(this, state, self)
+                            const res = self.executeCode(state, content, mapping, this)
                             if(typeof(res) == "boolean" && !res){
                                 event.stopPropagation()
                                 event.preventDefault()
