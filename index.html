@@ -15,6 +15,9 @@
             <span>You clicked me {count}</span><span if="{count}==1"> time</span><span if="{count}!=1"> times</span><br>
             <span>Nested variable: {nested.variable}</span>
         </div>
+        <h1 each="item in arr">
+            Hello <span style="color: red">{item}!</span>
+        </h1>
         <input type="text" name="inp0" autocomplete="off" placeholder="Type your name" oninput="state.name=this.value">
     </div>
 </body>

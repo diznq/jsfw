@@ -33,6 +33,7 @@ class FW {
                 const pool = self.watchdog[path] || []
                 target[key] = value
                 pool.forEach(item => item())
+                return true;
             }
         })
     }
@@ -54,12 +55,30 @@ class FW {
     }
 
     /**
+     * Remap state variable
+     * @param {string} key 
+     * @param {{[key: string]: string}} mapping 
+     */
+    remap(state, key, mapping){
+        for (const k in mapping) {
+            if (Object.hasOwnProperty.call(mapping, k)) {
+                const element = mapping[k];
+                if(key.startsWith(k)){
+                    return key.replace(k, element)
+                }
+            }
+        }
+        return key
+    }
+
+    /**
      * Get variable from state
      * @param {!{[key: string]: any}} state 
      * @param {!string} path 
      * @returns {any}
      */
-    get(state, path){
+    get(state, path, mapping){
+        path = this.remap(state, path, mapping)
         const parts = path.split(".")
         let obj = state
         let end = parts.pop()
@@ -71,29 +90,20 @@ class FW {
      * Bootstrap element
      * @param {!{[key: string]: any}} state
      * @param {!HTMLElement} element 
+     * @param {?{[key: string]: string}} mapping
      */
-    bootstrap(state, element) {
+    bootstrap(state, element, mapping) {
         element.wd = element.wd || []
+        mapping = mapping || {}
         const children = element.querySelectorAll(":scope > *")
-        // If element has no children, and only has a single node#3, we can replace {...} safely
-        if(children.length == 0){
-            const content = element.textContent
-            const matches = content.match(/\{(.*?)\}/g)
-            if(matches && matches.length > 0){
-                const fix = () => element.textContent = content.replace(/\{(.*?)\}/g, (_, m) => this.get(state, m))
-                matches.forEach(match => {
-                    const key = match.substring(1, match.length - 1)
-                    element.wd.push(this.addWatchdog(key, fix))
-                })
-                fix()
-            }
-        }
-
-        // If element is conditional, hide it if condition fails, display otherwise
+        
+        // If element is a conditional, hide it if the condition fails, display it otherwise
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
             const matches = condition.match(/\{([a-zA-Z0-9_.]+)\}/g)
-            condition = condition.replace(/\{(.*?)\}/g, "__STATE__.$1")
+            condition = condition.replace(/\{(.*?)\}/g, (_, m) => {
+                return "__STATE__." + this.remap(state, m, mapping)
+            })
             const evaluate = () => {
                 if(condition.indexOf("return") == -1) condition = `return (${condition})`;
                 const fn = new Function("__STATE__", condition)
@@ -103,9 +113,77 @@ class FW {
             const fix = () => element.style.display = evaluate() ? "" : "none"
             matches.forEach(match => {
                 const key = match.substring(1, match.length - 1)
-                element.wd.push(this.addWatchdog(key, fix))
+                element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
             })
             fix()
+        }
+
+        // If element is a loop
+        if(element.hasAttribute("each")){
+            // Expression must always be A in B
+            const params = element.getAttribute("each").split(" in ")
+            // Remove to avoid recursion later on
+            element.removeAttribute("each")
+            if(params.length == 2){
+                let clones = []
+                let [iterator, source] = params
+                // Create a dummy, in case all elements are gone we'll insert new clones behind this dummy
+                const dummy = document.createElement("span")
+                const clone = element.cloneNode(true)
+                const parent = element.parentElement
+                const src = this.get(state, source, {})
+                parent.insertBefore(dummy, element.nextSibling)
+                element.remove()
+                const spawnClone = (after, i) => {
+                    const newClone = clone.cloneNode(true)
+                    parent.insertBefore(newClone, after)
+                    newClone.innerIndex = i
+                    const newMapping = JSON.parse(JSON.stringify(mapping))
+                    newMapping[iterator] = source + "." + i
+                    this.bootstrap(state, newClone, newMapping)
+                    return newClone
+                }
+                source = this.remap(state, source, mapping)
+                this.addWatchdog(source + ".length", () => {
+                    let item = this.get(state, source, {})
+                    for(let i=clones.length; i<item.length; i++){
+                        let shiftClone = false
+                        if(clones.length == 0){
+                            clones.push(dummy)
+                            shiftClone = true
+                        }
+                        const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
+                        clones.push(newClone)
+                        if(shiftClone) clones.shift()
+                    }
+                    while(clones.length > item.length){
+                        const last = clones.pop()
+                        last.remove()
+                    }
+                })
+                for(let i=0; i<src.length; i++){
+                    const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
+                    clones.push(newClone)
+                }
+            }
+            // Root element doesn't exist anymore, so skip other processing
+            return;
+        }
+
+        // If element has no children, and only has a single node#3, we can replace {...} safely
+        if(children.length == 0){
+            const content = element.textContent
+            const matches = content.match(/\{(.*?)\}/g)
+            if(matches && matches.length > 0){
+                const fix = () => element.textContent = content.replace(/\{(.*?)\}/g, (_, m) =>  {
+                    return this.get(state, m, mapping)
+                })
+                matches.forEach(match => {
+                    const key = match.substring(1, match.length - 1)
+                    element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                })
+                fix()
+            }
         }
 
         // TODO: remove watchdogs in element.wd on destroy
@@ -113,7 +191,7 @@ class FW {
         // Loop through children
         children.forEach(child => {
             if(child.tagName == "SCRIPT") return;
-            this.bootstrap(state, child)
+            this.bootstrap(state, child, mapping)
         })
     }
 
@@ -125,6 +203,7 @@ const state = fw.addState({
     annyeong: "안녕",
     name: "",
     count: 0,
+    arr: [],
     nested: {
         variable: 0
     }
