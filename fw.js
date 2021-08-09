@@ -131,7 +131,9 @@ class FW {
                 const dummy = document.createElement("span")
                 const clone = element.cloneNode(true)
                 const parent = element.parentElement
-                const src = this.get(state, source, {})
+                const src = this.get(state, source, mapping)
+                source = this.remap(state, source, mapping)
+                console.log(src, source)
                 parent.insertBefore(dummy, element.nextSibling)
                 element.remove()
                 const spawnClone = (after, i) => {
@@ -143,18 +145,21 @@ class FW {
                     this.bootstrap(state, newClone, newMapping)
                     return newClone
                 }
-                source = this.remap(state, source, mapping)
+                const insertClone = (i) => {
+                    let shiftClone = false
+                    if(clones.length == 0){
+                        clones.push(dummy)
+                        shiftClone = true
+                    }
+                    const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
+                    clones.push(newClone)
+                    if(shiftClone) clones.shift()
+                    return newClone
+                }
                 this.addWatchdog(source + ".length", () => {
                     let item = this.get(state, source, {})
                     for(let i=clones.length; i<item.length; i++){
-                        let shiftClone = false
-                        if(clones.length == 0){
-                            clones.push(dummy)
-                            shiftClone = true
-                        }
-                        const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
-                        clones.push(newClone)
-                        if(shiftClone) clones.shift()
+                        insertClone(i)
                     }
                     while(clones.length > item.length){
                         const last = clones.pop()
@@ -162,8 +167,7 @@ class FW {
                     }
                 })
                 for(let i=0; i<src.length; i++){
-                    const newClone = spawnClone(clones[clones.length - 1].nextSibling, i)
-                    clones.push(newClone)
+                    insertClone(i)
                 }
             }
             // Root element doesn't exist anymore, so skip other processing
@@ -203,7 +207,9 @@ const state = fw.addState({
     annyeong: "안녕",
     name: "",
     count: 0,
-    arr: [],
+    arr: [
+        ["Jakub", "Anna"]
+    ],
     nested: {
         variable: 0
     }
