@@ -99,7 +99,9 @@ class FW {
         const parts = path.split(".")
         let obj = state
         let end = parts.pop()
-        while(parts.length > 0) obj=obj[parts.shift()]
+        while(parts.length > 0 && typeof(obj) != "undefined") obj=obj[parts.shift()]
+        if(typeof(obj) == "object" && !obj) return null
+        else if(typeof(obj) == "undefined") return null
         return obj[end]
     }
 
