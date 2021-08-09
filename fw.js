@@ -31,6 +31,9 @@ class FW {
                 let path = parentPath + "." + key
                 if(path.startsWith(".")) path = path.substring(1)
                 const pool = self.watchdog[path] || []
+                if(typeof(value) == "object"){
+                    value = self.addState(value, path)
+                }
                 target[key] = value
                 pool.forEach(item => item())
                 return true;
@@ -133,7 +136,7 @@ class FW {
                 const parent = element.parentElement
                 const src = this.get(state, source, mapping)
                 source = this.remap(state, source, mapping)
-                console.log(src, source)
+                //console.log(src, source)
                 parent.insertBefore(dummy, element.nextSibling)
                 element.remove()
                 const spawnClone = (after, i) => {
@@ -157,7 +160,7 @@ class FW {
                     return newClone
                 }
                 this.addWatchdog(source + ".length", () => {
-                    let item = this.get(state, source, {})
+                    let item = this.get(state, source, mapping)
                     for(let i=clones.length; i<item.length; i++){
                         insertClone(i)
                     }
