@@ -31,8 +31,7 @@ class FW {
             set(target, key, value){
                 let path = parentPath + "." + key
                 if(path.startsWith(".")) path = path.substring(1)
-                const pools = [path]
-
+                
                 function pushUpdate(obj, ppath){
                     if(ppath.startsWith(".")) ppath = ppath.substring(1)
                     const updatable = [ppath]
@@ -46,10 +45,11 @@ class FW {
                     }
                     return updatable
                 }
+
+                const pools = pushUpdate(value, path)
                 
                 // In case we set new object, make it proxy as well
                 if(typeof(value) == "object" && value != null){
-                    pools.push(... pushUpdate(value, path))
                     value = self.addState(value, path)
                 }
 
@@ -119,7 +119,6 @@ class FW {
             return "__STATE__." + this.remap(state, m, mapping).replace(/\.(\d+)/g, "[$1]")
         })
         if(code.indexOf("return") == -1) code = `return (${code})`;
-        console.log(code)
         const fn = new Function("__STATE__,self", code)
         if(typeof(self) != "undefined") 
             return fn.call(self, state, this)
@@ -181,7 +180,6 @@ class FW {
                 const parent = element.parentElement
                 const src = this.get(state, source, mapping)
                 source = this.remap(state, source, mapping)
-                //console.log(src, source)
                 parent.insertBefore(dummy, element.nextSibling)
                 element.remove()
                 const spawnClone = async (after, i) => {
