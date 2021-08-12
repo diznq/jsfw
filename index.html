@@ -6,29 +6,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <script src="fw.js"></script>
+    <script src="app.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div fw>
-        <div if="/^\/users\/?$/.test({route})">
-            <h1 fw:onclick="alert({route})">Users:</h1>
-            <table style="border-collapse: collapse; width: 500px" border="1">
-                <tr><th>Name</th><th>Age</th></tr>
-                <tr each="user in users">
-                    <td><a fw:href="#/users/{user.id}" onclick="state.route = this.hash.substring(1)">{user.name}</a></td>
-                    <td>{user.age}</td>
-                </tr>
-            </table>
-            <form fw:onsubmit="{users}.push({id: {users.length}, name: 'User#' + {users.length}, age: Math.random()}); return false;">
-                <input type="submit">
-            </form>
-        </div>
-        <div if="/^\/users\/(.+)/.test({route})" then="loadUser()">
-            <a href="#/users" onclick="state.route = this.hash.substring(1)">&lt; Back</a>
-            <div if="{viewedUser}">
-                <h1>User: {viewedUser.name}</h1>
-                <h2>Age: {viewedUser.age}</h2>
+        <div class="chatroom">
+            <div class="chats">
+                <div each="chat in chats">
+                    <div fw:onclick="openChat({chat})" class="chat-side">
+                        <div class="chat-name">{chat.name}</div>
+                        <div class="chat-msg">
+                            <span if="{chat.lastMessage.own}">Me: </span>
+                            <span>{chat.lastMessage.text}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <h1 if="!{viewedUser}">Unknown user</h1>
+            <div class="chat">
+                <div if="{activeChat.open}">
+                    <div class="chat-header">{activeChat.name}</div>
+                    <div class="chat-messages">
+                        <div each="message in activeChat.messages">
+                            <div if="{message.fromMe}">
+                                <div class="msg msg-1st">{message.text}</div>
+                            </div>
+                            <div if="!{message.fromMe}">
+                                <div class="msg msg-3rd">{message.text}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div if="!{activeChat.open}" class="select-chatroom">
+                    Select a chat room
+                </div>
+            </div>
         </div>
     </div>
 </body>

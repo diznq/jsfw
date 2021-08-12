@@ -31,25 +31,30 @@ class FW {
             set(target, key, value){
                 let path = parentPath + "." + key
                 if(path.startsWith(".")) path = path.substring(1)
-                const pools = [self.watchdog[path] || []]
+                const pools = [path]
+
+                function pushUpdate(obj, ppath){
+                    if(ppath.startsWith(".")) ppath = ppath.substring(1)
+                    const updatable = [ppath]
+                    if(typeof(obj) != "object" || obj == null) return updatable
+                    if(typeof(obj.length) == "number") updatable.push(ppath + ".length")
+                    for (const key in obj) {
+                        if (Object.hasOwnProperty.call(obj, key)) {
+                            const element = obj[key];
+                            updatable.push(... pushUpdate(element, ppath + "." + key))
+                        }
+                    }
+                    return updatable
+                }
                 
                 // In case we set new object, make it proxy as well
                 if(typeof(value) == "object" && value != null){
-                    // If it's an array, push length update + all items update
-                    let isArray = typeof(value.length) == "number"
-                    if(isArray){
-                        pools.push(self.watchdog[path + ".length"] || [])
-                        for(let i=0; i<value.length; i++){
-                            pools.push(self.watchdog[path + "." + i] || [])
-                        }
-                    } else {
-                        Object.keys(value).forEach(key => pools.push(self.watchdog[path + "." + key] || []))
-                    }
+                    pools.push(... pushUpdate(value, path))
                     value = self.addState(value, path)
                 }
 
                 target[key] = value
-                pools.forEach(pool => pool.forEach(item => item()))
+                pools.forEach(pool => (self.watchdog[pool] || []).forEach(item => item()))
                 return true;
             }
         })
@@ -66,8 +71,11 @@ class FW {
         this.watchdog[key] = this.watchdog[key] || []
         this.watchdog[key].push(callback)
         if(run) callback()
-        return () => {
-            this.watchdog[key] = this.watchdog[key].map(fn => fn != callback)
+        return {
+            key,
+            remove: () => {
+                this.watchdog[key] = this.watchdog[key].map(fn => fn != callback)
+            }
         }
     }
 
@@ -108,7 +116,7 @@ class FW {
     executeCode(state, code, mapping, self) {
         const varmatch = this.varmatch
         code = code.replace(varmatch, (_, m) => {
-            return "__STATE__." + this.remap(state, m, mapping)
+            return "__STATE__." + this.remap(state, m, mapping).replace(/\.(\d+)/g, "[$1]")
         })
         if(code.indexOf("return") == -1) code = `return (${code})`;
         console.log(code)
@@ -269,48 +277,4 @@ class FW {
             this.bootstrap(state, child, mapping)
         })
     }
-
 }
-
-const fw = new FW()
-const state = fw.addState({
-    route: location.hash.substring(1),
-    users: [
-        {
-            id: 0,
-            name: "Jakub",
-            age: 23,
-        },
-        {
-            id: 1,
-            name: "Anna",
-            age: 21
-        }
-    ],
-    viewedUser: {
-        id: 0,
-        name: "",
-        age: 0
-    }
-})
-
-function navigate(path){
-    location.hash = path
-    state.route = path
-}
-
-function loadUser(){
-    return new Promise( (resolve) => {
-        setTimeout( () => {
-            let match = state.route.match(/^\/users\/(.*)/)[1]
-            state.viewedUser = state.users[match]
-            resolve()
-        }, 1000);
-    });
-}
-
-function init(){
-    const elements = document.querySelectorAll("[fw]")
-    elements.forEach(element => fw.bootstrap(state, element))
-}
-window.onload = () => init()

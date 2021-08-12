@@ -1,0 +1,61 @@
+* {
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+html, body {
+    margin: 0px;
+}
+
+.chatroom {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    flex-direction: row;
+}
+
+.chats {
+    display: flex;
+    width: 240px;
+    flex-direction: column;
+    height: 100%;
+    border-right: 1px solid #DDD;
+}
+
+.chats .chat-side {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.chats .chat-side  .chat-name {
+    font-weight: 600;
+}
+
+.chat {
+    display: flex;
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.chat-header {
+    padding: 20px;
+    width: 100%;
+    border-bottom: 1px solid #DDD;
+    font-weight: 600;
+}
+
+.msg {
+    padding: 10px;
+    border-radius: 10px;
+    margin: 4px;
+}
+
+.msg-1st {
+    background: yellow;
+}
+
+.msg-3rd {
+    background: #DDD;
+}
