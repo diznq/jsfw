@@ -14,30 +14,30 @@
         <div class="chatroom">
             <div class="chats">
                 <div each="chat in chats">
-                    <div fw:onclick="openChat({chat})" class="chat-side">
-                        <div class="chat-name">{chat.name}</div>
+                    <div fw:onclick="openChat({{chat}})" class="chat-side">
+                        <div class="chat-name">{{chat.name}}</div>
                         <div class="chat-msg">
-                            <span if="{chat.lastMessage.own}">Me: </span>
-                            <span>{chat.lastMessage.text}</span>
+                            <span if="{{chat.lastMessage.own}}">Me: </span>
+                            <span>{{chat.lastMessage.text}}</span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="chat">
-                <div if="{activeChat.open}">
-                    <div class="chat-header">{activeChat.name}</div>
+                <div if="{{activeChat.open}}">
+                    <div class="chat-header">{{activeChat.name}}</div>
                     <div class="chat-messages">
                         <div each="message in activeChat.messages">
-                            <div if="{message.fromMe}">
-                                <div class="msg msg-1st">{message.text}</div>
+                            <div if="{{message.fromMe}}">
+                                <div class="msg msg-1st">{{message.text}}</div>
                             </div>
-                            <div if="!{message.fromMe}">
-                                <div class="msg msg-3rd">{message.text}</div>
+                            <div if="!{{message.fromMe}}">
+                                <div class="msg msg-3rd">{{message.text}}</div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div if="!{activeChat.open}" class="select-chatroom">
+                <div if="!{{activeChat.open}}" class="select-chatroom">
                     Select a chat room
                 </div>
             </div>

@@ -1,10 +1,13 @@
+/**
+ * Main framework instance, private methods begin with underscore
+ */
 class FW {
     /**
      * Create new framework instance
      */
     constructor(){
-        this.watchdog = {}
-        this.varmatch = /\{([a-zA-Z0-9_.]+)\}/g;
+        this.observers = {}
+        this.varmatch = /\{\{(.+?)\}\}/g;
     }
 
     /**
@@ -54,37 +57,46 @@ class FW {
                 }
 
                 target[key] = value
-                pools.forEach(pool => (self.watchdog[pool] || []).forEach(item => item()))
+                pools.forEach(pool => (self.observers[pool] || []).forEach(async(listener) => {
+                    try {
+                        let result = listener()
+                        if(typeof(result) == "object" && typeof(result.then) == "function"){
+                            await result
+                        }
+                    } catch(ex){
+                        console.error("Listener for " + pool + " failed with: ", ex)
+                    }
+                }))
                 return true;
             }
         })
     }
 
     /**
-     * Add listener
-     * @param {!string} key 
-     * @param {!(() => void)} callback 
-     * @param {?boolean} run 
+     * Add observer for given state key
+     * @param {!string} key state key to observe, for arrays, instead of using [n], use .n, i.e. (messages.0.text => messages[0].text)
+     * @param {!(() => void)} callback listener that's called when value changes
+     * @param {?boolean} run true if callback to be run immediately after this call
      */
-    addWatchdog(key, callback, run){
+    observe(key, callback, run){
         run = run || false
-        this.watchdog[key] = this.watchdog[key] || []
-        this.watchdog[key].push(callback)
+        this.observers[key] = this.observers[key] || []
+        this.observers[key].push(callback)
         if(run) callback()
         return {
             key,
             remove: () => {
-                this.watchdog[key] = this.watchdog[key].map(fn => fn != callback)
+                this.observers[key] = this.observers[key].map(fn => fn != callback)
             }
         }
     }
 
     /**
-     * Remap state variable
+     * _remap state variable given the context
      * @param {string} key 
      * @param {{[key: string]: string}} mapping 
      */
-    remap(state, key, mapping){
+    _remap(state, key, mapping){
         for (const k in mapping) {
             if (Object.hasOwnProperty.call(mapping, k)) {
                 const element = mapping[k];
@@ -103,7 +115,7 @@ class FW {
      * @returns {any}
      */
     get(state, path, mapping){
-        path = this.remap(state, path, mapping)
+        path = this._remap(state, path, mapping)
         const parts = path.split(".")
         let obj = state
         let end = parts.pop()
@@ -113,10 +125,18 @@ class FW {
         return obj[end]
     }
 
+    /**
+     * Execute string as a code given the state
+     * @param {!{[key: string]: any}} state current state
+     * @param {!string} code code to be executed
+     * @param {!{[key: string]: string}} mapping context mapping
+     * @param {HTMLElement} self used as this inside code execution 
+     * @returns 
+     */
     executeCode(state, code, mapping, self) {
         const varmatch = this.varmatch
         code = code.replace(varmatch, (_, m) => {
-            return "__STATE__." + this.remap(state, m, mapping).replace(/\.(\d+)/g, "[$1]")
+            return "__STATE__." + this._remap(state, m, mapping).replace(/\.(\d+)/g, "[$1]")
         })
         if(code.indexOf("return") == -1) code = `return (${code})`;
         const fn = new Function("__STATE__,self", code)
@@ -137,7 +157,7 @@ class FW {
         mapping = mapping || {}
         const children = element.querySelectorAll(":scope > *")
         
-        // If element is a conditional, hide it if the condition fails, display it otherwise
+        // If the element is a conditional, hide it if the condition fails, display it otherwise
         if(element.hasAttribute("if")){
             let condition = element.getAttribute("if")
             const matches = condition.match(varmatch)
@@ -155,17 +175,16 @@ class FW {
                         await retval;
                     }
                 }
-
                 element.style.display = result ? "" : "none"
             }
             matches.forEach(match => {
-                const key = match.substring(1, match.length - 1)
-                element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                const key = match.substring(2, match.length - 2)
+                element.wd.push(this.observe(this._remap(state, key, mapping), fix))
             })
             await fix()
         }
 
-        // If element is a loop
+        // If the element is a loop
         if(element.hasAttribute("each")){
             // Expression must always be A in B
             const params = element.getAttribute("each").split(" in ")
@@ -179,7 +198,7 @@ class FW {
                 const clone = element.cloneNode(true)
                 const parent = element.parentElement
                 const src = this.get(state, source, mapping)
-                source = this.remap(state, source, mapping)
+                source = this._remap(state, source, mapping)
                 parent.insertBefore(dummy, element.nextSibling)
                 element.remove()
                 const spawnClone = async (after, i) => {
@@ -188,7 +207,11 @@ class FW {
                     newClone.innerIndex = i
                     const newMapping = JSON.parse(JSON.stringify(mapping))
                     newMapping[iterator] = source + "." + i
-                    await this.bootstrap(state, newClone, newMapping)
+                    try {
+                        await this.bootstrap(state, newClone, newMapping)
+                    } catch(ex){
+                        console.error("Bootstraping failed with: ", ex)
+                    }
                     return newClone
                 }
                 const insertClone = async (i) => {
@@ -202,7 +225,7 @@ class FW {
                     if(shiftClone) clones.shift()
                     return newClone
                 }
-                this.addWatchdog(source + ".length", async () => {
+                this.observe(source + ".length", async () => {
                     let item = this.get(state, source, mapping)
                     for(let i=clones.length; i<item.length; i++){
                         await insertClone(i)
@@ -242,8 +265,8 @@ class FW {
                             return this.get(state, m, mapping)
                         }))
                         matches.forEach(match => {
-                            const key = match.substring(1, match.length - 1)
-                            element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                            const key = match.substring(2, match.length - 2)
+                            element.wd.push(this.observe(this._remap(state, key, mapping), fix))
                         })
                         fix()
                     }
@@ -260,14 +283,14 @@ class FW {
                     return this.get(state, m, mapping)
                 })
                 matches.forEach(match => {
-                    const key = match.substring(1, match.length - 1)
-                    element.wd.push(this.addWatchdog(this.remap(state, key, mapping), fix))
+                    const key = match.substring(2, match.length - 2)
+                    element.wd.push(this.observe(this._remap(state, key, mapping), fix))
                 })
                 fix()
             }
         }
 
-        // TODO: remove watchdogs in element.wd on destroy
+        // TODO: remove observerss in element.wd on destroy
 
         // Loop through children
         children.forEach(child => {

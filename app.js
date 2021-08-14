@@ -4,12 +4,12 @@ const messagingService = {
     messages: {
         "1": [
             {
-                text: "Ahoj!",
+                text: "Hi!",
                 fromMe: true,
                 sent: true
             },
             {
-                text: "Ahoj!",
+                text: "Hey!",
                 fromMe: false,
                 sent: true
             },
@@ -29,9 +29,9 @@ const state = fw.addState({
     chats: [
         {
             id: "1",
-            name: "Janka z Arku",
+            name: "Jane Smith",
             lastMessage: {
-                text: "Ahoj!",
+                text: "Hey!",
                 fromMe: false
             }
         }
