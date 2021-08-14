@@ -131,17 +131,28 @@ class FW {
      * @param {!string} code code to be executed
      * @param {!{[key: string]: string}} mapping context mapping
      * @param {HTMLElement} self used as this inside code execution 
+     * @param {[key: string]: any} params rest of params
      * @returns 
      */
-    executeCode(state, code, mapping, self) {
+    executeCode(state, code, mapping, self, params) {
+        params = params || {}
         const varmatch = this.varmatch
         code = code.replace(varmatch, (_, m) => {
             return "__STATE__." + this._remap(state, m, mapping).replace(/\.(\d+)/g, "[$1]")
         })
         if(code.indexOf("return") == -1) code = `return (${code})`;
-        const fn = new Function("__STATE__,self", code)
+        let paramsKeys = ["__STATE__", "self"]
+        let paramsValues = [state, this]
+        for (const key in params) {
+            if (Object.hasOwnProperty.call(params, key)) {
+                const element = params[key];
+                paramsKeys.push(key)
+                paramsValues.push(element)
+            }
+        }
+        const fn = new Function(paramsKeys.join(","), code)
         if(typeof(self) != "undefined") 
-            return fn.call(self, state, this)
+            return fn.call(self, ... paramsValues)
         return fn(state, this)
     }
 
@@ -253,7 +264,7 @@ class FW {
                     if(attr.startsWith("fw:on")){
                         const self = this
                         element[attr.substring(3)] = function (event) {
-                            const res = self.executeCode(state, content, mapping, this)
+                            const res = self.executeCode(state, content, mapping, this, {event})
                             if(typeof(res) == "boolean" && !res){
                                 event.stopPropagation()
                                 event.preventDefault()
