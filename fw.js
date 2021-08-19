@@ -170,6 +170,7 @@ class FW {
         
         // If the element is a conditional, hide it if the condition fails, display it otherwise
         if(element.hasAttribute("if")){
+            let isHard = element.hasAttribute("hard")
             let condition = element.getAttribute("if")
             const matches = condition.match(varmatch)
             const evaluate = async () => {
@@ -187,12 +188,14 @@ class FW {
                     }
                 }
                 element.style.display = result ? "" : "none"
+                return result;
             }
             matches.forEach(match => {
                 const key = match.substring(2, match.length - 2)
                 element.wd.push(this.observe(this._remap(state, key, mapping), fix))
             })
-            await fix()
+            const ifres = await fix()
+            if(!ifres && isHard) return;
         }
 
         // If the element is a loop

@@ -28,10 +28,10 @@
                     <div class="chat-header">{{activeChat.name}}</div>
                     <div class="chat-messages">
                         <div each="message in activeChat.messages">
-                            <div if="{{message.fromMe}}">
+                            <div hard if="{{message.fromMe}}">
                                 <div class="msg msg-1st">{{message.text}}</div>
                             </div>
-                            <div if="!{{message.fromMe}}">
+                            <div hard if="!{{message.fromMe}}">
                                 <div class="msg msg-3rd">{{message.text}}</div>
                             </div>
                         </div>
